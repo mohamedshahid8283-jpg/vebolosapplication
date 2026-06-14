@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   SafeAreaView,
   ScrollView,
@@ -10,95 +10,199 @@ import {
   ImageBackground,
   Dimensions,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
+
+// Redux Architecture Hooks & Actions Integration
+import { useSelector, useDispatch } from 'react-redux';
+import { setProfile, setLoading } from '../../redux/slices/profileSlice';
+
+// Structural Context, Utilities, and Persistence Services
+import useTheme from '../../hooks/useTheme';
+import storageService from '../../services/storageService';
+import { STORAGE_KEYS } from '../../utils/constants';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 export default function HomeScreen({ navigation }) {
-  const [searchQuery, setSearchQuery] = useState('');
+  const dispatch = useDispatch();
 
-  // Configured mock data based on design profile details
-  const sampleUser = {
-    name: 'Aanya',
-    age: 24,
-    role: 'Designer',
-    location: 'Bangalore',
-    image:
-      'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&q=80&w=600',
-    about: 'Love traveling, coffee and deep conversations. 💜',
-    interests: ['Travel', 'Photography', 'Music', 'Coffee'],
+  // Extract global dynamic color configurations using your custom theme engine hook
+  const { colors } = useTheme();
+
+  // Extract application state variables out from the central Redux engine
+  const { profile: currentProfile, loading: isLoading } = useSelector(
+    state => state.profile,
+  );
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [activeUserCount, setActiveUserCount] = useState(148);
+
+  // FIXED: Added empty dependency array to prevent the infinite execution loop
+  useEffect(() => {
+    fetchDiscoveryFeed();
+  }, []);
+
+  // Simulates an asynchronous data fetch from storage/API, syncing to Redux global state
+  const fetchDiscoveryFeed = async () => {
+    try {
+      dispatch(setLoading(true));
+
+      // 1. Check for a locally persisted user setup state configuration entry
+      const localUserData = await storageService.getItem(STORAGE_KEYS.USER);
+
+      // 2. Fallback sample data if storage hasn't been written to by a SignUp yet
+      const fallbackProfile = {
+        id: 'user_aanya_01',
+        name: 'Aanya',
+        age: 24,
+        role: 'Designer',
+        location: 'Bangalore',
+        image:
+          'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&q=80&w=600',
+        about: 'Love traveling, coffee and deep conversations. 💜',
+        interests: ['Travel', 'Photography', 'Music', 'Coffee'],
+      };
+
+      const finalActiveProfile = localUserData || fallbackProfile;
+
+      // 3. Update Redux store global state.
+      dispatch(setProfile(finalActiveProfile));
+
+      // Simulate micro-drift animation for live user calculations
+      setActiveUserCount(Math.floor(Math.random() * (160 - 140 + 1)) + 140);
+    } catch (error) {
+      console.error(error);
+      Alert.alert(
+        'Data Error',
+        'Unable to retrieve data metrics from storage service.',
+      );
+    } finally {
+      // GUARANTEED RUN: Ensures loading spinner turns off even if an exception occurs
+      dispatch(setLoading(false));
+    }
   };
 
-  // Functional action click trigger handlers
   const handleDislike = () => {
-    Alert.alert('Passed', `You skipped ${sampleUser.name}'s profile.`);
+    if (currentProfile) {
+      Alert.alert(
+        'Passed',
+        `You skipped ${currentProfile.name || 'this'} profile.`,
+      );
+    }
   };
 
   const handleLike = () => {
-    Alert.alert('Liked! 💜', `You liked ${sampleUser.name}'s profile!`);
+    if (currentProfile) {
+      Alert.alert(
+        'Liked! 💜',
+        `You liked ${currentProfile.name || 'this'} profile!`,
+      );
+    }
   };
 
   const handleSuperLike = () => {
-    Alert.alert(
-      'Super Like! ⭐',
-      `You sent a Super Like to ${sampleUser.name}!`,
-    );
+    if (currentProfile) {
+      Alert.alert(
+        'Super Like! ⭐',
+        `You sent a Super Like to ${currentProfile.name || 'this'}!`,
+      );
+    }
   };
 
+  // Render uniform activity loading spinner component layout matching framework rules
+  if (isLoading || !currentProfile) {
+    return (
+      <View
+        style={[
+          styles.loadingContainer,
+          { backgroundColor: colors.background },
+        ]}
+      >
+        <ActivityIndicator size="large" color="#6338E8" />
+        <Text style={[styles.loadingText, { color: colors.subText }]}>
+          Syncing with Vebolos...
+        </Text>
+      </View>
+    );
+  }
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.background }]}
+    >
       {/* Brand Customized Header Row */}
-      <View style={styles.header}>
+      <View
+        style={[
+          styles.header,
+          { backgroundColor: colors.card, borderBottomColor: colors.border },
+        ]}
+      >
         <View style={styles.headerTitleContainer}>
           <Ionicons name="heart-half" size={26} color="#6338E8" />
           <Text style={styles.brandText}>Vebolos</Text>
         </View>
-        <TouchableOpacity style={styles.notificationButton}>
-          <Ionicons name="options-outline" size={22} color="#000000" />
+
+        {/* Dynamic Online Counter Badge */}
+        <View style={styles.liveCounterContainer}>
+          <View style={styles.liveGreenIndicatorPulse} />
+          <Text style={styles.liveCounterText}>{activeUserCount} Online</Text>
+        </View>
+
+        <TouchableOpacity
+          style={styles.notificationButton}
+          onPress={fetchDiscoveryFeed}
+        >
+          <Ionicons name="refresh-outline" size={22} color={colors.text} />
         </TouchableOpacity>
       </View>
 
-      {/* Main Main Content Feed Area */}
       <ScrollView
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* Search Input Filter Component */}
-        <View style={styles.searchBarContainer}>
+        {/* Search Input Box */}
+        <View
+          style={[
+            styles.searchBarContainer,
+            { backgroundColor: colors.border },
+          ]}
+        >
           <Ionicons
             name="search-outline"
             size={20}
-            color="#9CA3AF"
+            color={colors.subText}
             style={styles.searchIcon}
           />
           <TextInput
             value={searchQuery}
             onChangeText={setSearchQuery}
             placeholder="Search profiles"
-            placeholderTextColor="#9CA3AF"
-            style={styles.searchInput}
+            placeholderTextColor={colors.subText}
+            style={[styles.searchInput, { color: colors.text }]}
           />
         </View>
 
-        {/* Profile Card Viewport Container */}
+        {/* Dynamic Profile Card Viewport */}
         <TouchableOpacity
           activeOpacity={0.9}
           style={styles.cardWrapper}
           onPress={() =>
-            navigation.navigate('UserDetails', { user: sampleUser })
+            navigation.navigate('UserDetails', { user: currentProfile })
           }
         >
           <ImageBackground
-            source={{ uri: sampleUser.image }}
+            source={{
+              uri: currentProfile.image || 'https://via.placeholder.com/600',
+            }}
             style={styles.cardImage}
             imageStyle={styles.cardImageRadius}
           >
-            {/* Overlay User Text Information */}
             <View style={styles.cardTextOverlay}>
               <View style={styles.nameRow}>
                 <Text style={styles.profileName}>
-                  {sampleUser.name}, {sampleUser.age}
+                  {currentProfile.name || 'User'}, {currentProfile.age || '24'}
                 </Text>
                 <Ionicons
                   name="checkmark-circle"
@@ -108,16 +212,21 @@ export default function HomeScreen({ navigation }) {
                 />
               </View>
               <Text style={styles.profileMeta}>
-                {sampleUser.role} • {sampleUser.location}
+                {currentProfile.role || 'Member'} •{' '}
+                {currentProfile.location || 'Bangalore'}
               </Text>
             </View>
           </ImageBackground>
         </TouchableOpacity>
 
-        {/* Action Button Controls (Sits directly underneath user image card) */}
+        {/* Action Button Controls Row */}
         <View style={styles.actionButtonsRow}>
           <TouchableOpacity
-            style={[styles.circleButton, styles.dislikeButton]}
+            style={[
+              styles.circleButton,
+              styles.dislikeButton,
+              { backgroundColor: colors.card, borderColor: colors.border },
+            ]}
             onPress={handleDislike}
           >
             <Ionicons name="close" size={26} color="#666666" />
@@ -131,7 +240,11 @@ export default function HomeScreen({ navigation }) {
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={[styles.circleButton, styles.starButton]}
+            style={[
+              styles.circleButton,
+              styles.starButton,
+              { backgroundColor: colors.card, borderColor: colors.border },
+            ]}
             onPress={handleSuperLike}
           >
             <Ionicons name="star" size={24} color="#FFB300" />
@@ -145,7 +258,16 @@ export default function HomeScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 12,
+  },
+  loadingText: {
+    fontSize: 14,
+    fontWeight: '500',
   },
   header: {
     height: 60,
@@ -154,7 +276,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
   },
   headerTitleContainer: {
     flexDirection: 'row',
@@ -167,18 +288,39 @@ const styles = StyleSheet.create({
     color: '#6338E8',
     letterSpacing: -0.5,
   },
+  liveCounterContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#ECFDF5',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#A7F3D0',
+  },
+  liveGreenIndicatorPulse: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#10B981',
+    marginRight: 6,
+  },
+  liveCounterText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: '#047857',
+  },
   notificationButton: {
     padding: 6,
   },
   scrollContent: {
     paddingHorizontal: 16,
     paddingTop: 16,
-    paddingBottom: 40, // Ensures layout space at the bottom when scrolling
+    paddingBottom: 40,
   },
   searchBarContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F3F4F6',
     borderRadius: 14,
     paddingHorizontal: 14,
     height: 48,
@@ -190,7 +332,6 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 15,
-    color: '#000000',
     height: '100%',
   },
   cardWrapper: {
@@ -234,11 +375,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     gap: 20,
-    marginTop: 24, // Ties actions closely underneath image container
+    marginTop: 24,
     marginBottom: 10,
   },
   circleButton: {
-    backgroundColor: '#FFFFFF',
     justifyContent: 'center',
     alignItems: 'center',
     shadowColor: '#000',
@@ -252,7 +392,6 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 28,
     borderWidth: 1,
-    borderColor: '#F3F4F6',
   },
   likeButtonPrimary: {
     width: 72,
@@ -265,6 +404,5 @@ const styles = StyleSheet.create({
     height: 56,
     borderRadius: 28,
     borderWidth: 1,
-    borderColor: '#F3F4F6',
   },
 });

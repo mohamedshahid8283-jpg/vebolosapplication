@@ -44,8 +44,8 @@ const styles = StyleSheet.create({
   },
 
   logo: {
-    width: 140,
-    height: 140,
+    width: 300,
+    height: 300,
   },
 
   appName: {

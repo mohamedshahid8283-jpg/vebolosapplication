@@ -12,8 +12,10 @@ const Stack = createNativeStackNavigator();
 export default function AuthNavigator() {
   return (
     <Stack.Navigator
+      initialRouteName="Splash"
       screenOptions={{
         headerShown: false,
+        animation: 'slide_from_right', // Clean transition animations across forms
       }}
     >
       <Stack.Screen name="Splash" component={SplashScreen} />

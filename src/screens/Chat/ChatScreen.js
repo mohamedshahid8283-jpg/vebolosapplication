@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   SafeAreaView,
   FlatList,
@@ -10,148 +10,303 @@ import {
   TouchableOpacity,
   KeyboardAvoidingView,
   Platform,
+  Alert,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
+// Global Redux, Hooks, and Theme Integration Slices
+import { useSelector, useDispatch } from 'react-redux';
+import useChat from '../../hooks/useChat';
+import useTheme from '../../hooks/useTheme';
+import useSocket from '../../hooks/useSocket';
+import {
+  setCallStatus,
+  setRemoteUser,
+} from '../../redux/slices/videoCallSlice';
+
+// System Infrastructure Utilities and Form Trackers
+import { formatTime } from '../../utils/dateFormatter';
+import { requestVideoCallPermissions } from '../../utils/permissons';
+import { CALL_STATUS } from '../../utils/constants';
+
+// 1. ISOLATED COMPOSER: Prevents parent keyboard state from re-rendering the entire chat timeline
+const ChatInputToolbar = React.memo(
+  ({ onSendMessage, onTypingStatusChange, colors }) => {
+    const [localInput, setLocalInput] = useState('');
+
+    // Automatically broadcast typing indicators with a clean debounce pattern
+    useEffect(() => {
+      if (!onTypingStatusChange) return;
+
+      if (localInput.trim().length > 0) {
+        onTypingStatusChange(true);
+      }
+
+      const typingTimeout = setTimeout(() => {
+        onTypingStatusChange(false);
+      }, 2000); // Marks user as stopped if they pause typing for 2 seconds
+
+      return () => clearTimeout(typingTimeout);
+    }, [localInput, onTypingStatusChange]);
+
+    const handlePressSend = () => {
+      const cleanMsg = localInput.trim();
+      if (!cleanMsg) return;
+      onSendMessage(cleanMsg);
+      setLocalInput('');
+    };
+
+    return (
+      <View
+        style={[
+          styles.inputToolbarContainer,
+          { backgroundColor: colors.card, borderTopColor: colors.border },
+        ]}
+      >
+        <View
+          style={[
+            styles.inputWrapperFrame,
+            { backgroundColor: colors.background },
+          ]}
+        >
+          <TextInput
+            style={[styles.textInputField, { color: colors.text }]}
+            placeholder="Type a message..."
+            placeholderTextColor="#9CA3AF"
+            value={localInput}
+            onChangeText={setLocalInput}
+            multiline
+          />
+          <TouchableOpacity style={styles.emojiButton}>
+            <Ionicons name="happy-outline" size={24} color="#9CA3AF" />
+          </TouchableOpacity>
+        </View>
+
+        <TouchableOpacity
+          style={styles.sendActionButton}
+          onPress={handlePressSend}
+        >
+          <Ionicons name="send" size={20} color="#FFFFFF" />
+        </TouchableOpacity>
+      </View>
+    );
+  },
+);
+
 export default function ChatScreen({ route, navigation }) {
-  // Use fallback user properties matching parameters if unspecified
+  const dispatch = useDispatch();
+  const listRef = useRef(null);
+
+  const { messages, sendMessage, typingUsers } = useChat();
+  const { colors } = useTheme();
+  const socketService = useSocket();
+
+  const { user: currentLoggedUser } = useSelector(state => state.auth);
+
   const { user } = route.params || {
     user: {
+      id: 'fallback_user_1',
       name: 'Aanya',
       image:
         'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&q=80&w=150',
     },
   };
 
-  const [inputMessage, setInputMessage] = useState('');
-  const [messages, setMessages] = useState([
-    {
-      id: '1',
-      text: 'Hey! How are you?',
-      sender: 'other',
-      time: '10:10 AM',
-    },
-    {
-      id: '2',
-      text: "I'm good, thank you!",
-      sender: 'me',
-      time: '10:11 AM',
-    },
-    {
-      id: '3',
-      text: 'What are you up to?',
-      sender: 'other',
-      time: '10:25 AM',
-    },
-    {
-      id: '4',
-      text: 'Just finished work.',
-      sender: 'me',
-      time: '10:32 AM',
-    },
-    {
-      id: '5',
-      text: 'Nice! Any plans for the weekend?',
-      sender: 'other',
-      time: '10:32 AM',
-    },
-    {
-      id: '6',
-      text: 'Not yet, maybe a road trip! 🚗💨',
-      sender: 'me',
-      time: '10:33 AM',
-    },
-  ]);
+  const [isOtherUserTyping, setIsOtherUserTyping] = useState(false);
 
-  const handleSend = () => {
-    if (!inputMessage.trim()) return;
+  // Sync sockets safely
+  useEffect(() => {
+    if (currentLoggedUser?.id && socketService?.socket) {
+      socketService.joinRoom(user.id);
+    }
 
-    const timestamp = new Date().toLocaleTimeString([], {
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-    const nextMsg = {
-      id: Date.now().toString(),
-      text: inputMessage.trim(),
-      sender: 'me',
-      time: timestamp,
+    if (socketService?.socket) {
+      socketService.onMessage(incomingMessage => {
+        if (incomingMessage.senderId === user.id) {
+          sendMessage(incomingMessage);
+        }
+      });
+    }
+
+    if (typingUsers) {
+      setIsOtherUserTyping(typingUsers.includes(user.id));
+    }
+
+    return () => {
+      if (currentLoggedUser?.id && socketService?.socket) {
+        socketService.leaveRoom(user.id);
+      }
     };
+  }, [user.id, typingUsers, currentLoggedUser, socketService, sendMessage]);
 
-    setMessages(prev => [...prev, nextMsg]);
-    setInputMessage('');
+  // Lock scroll index target focusing logic cleanly
+  useEffect(() => {
+    if (messages.length > 0) {
+      const timer = setTimeout(
+        () => listRef.current?.scrollToEnd({ animated: true }),
+        60,
+      );
+      return () => clearTimeout(timer);
+    }
+  }, [messages]);
+
+  // 2. CALLBACK HOOK: Wrapped to block unnecessary render updates downstream
+  const onSendPayload = useCallback(
+    textPayload => {
+      const messagePayload = {
+        id: Date.now().toString(),
+        text: textPayload,
+        sender: 'me',
+        senderId: currentLoggedUser?.id || 'me',
+        receiverId: user.id,
+        time: formatTime(new Date()),
+      };
+
+      sendMessage(messagePayload);
+      if (socketService?.socket) {
+        socketService.sendMessage(messagePayload);
+      }
+    },
+    [user.id, currentLoggedUser, sendMessage, socketService],
+  );
+
+  // Handle outbound real-time typing events safely
+  const handleTypingStatusChange = useCallback(
+    isTyping => {
+      if (socketService?.socket && currentLoggedUser?.id) {
+        socketService.socket.emit('typing_status', {
+          senderId: currentLoggedUser.id,
+          receiverId: user.id,
+          isTyping,
+        });
+      }
+    },
+    [user.id, currentLoggedUser, socketService],
+  );
+
+  const handleAppVideoCallInitiate = async () => {
+    const hasHardwarePermissions = await requestVideoCallPermissions();
+    if (!hasHardwarePermissions) {
+      Alert.alert(
+        'Hardware Required',
+        'Camera and Audio permissions are required to start a chat call.',
+      );
+      return;
+    }
+
+    dispatch(setRemoteUser(user));
+    dispatch(setCallStatus(CALL_STATUS.SEARCHING));
+
+    if (socketService?.socket) {
+      socketService.startVideoCall({
+        receiverId: user.id,
+        senderName: currentLoggedUser?.name,
+      });
+    }
+
+    navigation.navigate('VideoCall');
   };
 
-  const renderBubble = ({ item }) => {
-    const isMe = item.sender === 'me';
-    return (
-      <View style={styles.bubbleRowContainer}>
-        <View
-          style={[
-            styles.bubbleWrapper,
-            isMe ? styles.myBubbleAlign : styles.otherBubbleAlign,
-          ]}
-        >
+  // 3. MEMOIZED ROW BUBBLE: Stops execution updates from redrawing stable text entries
+  const renderBubble = useCallback(
+    ({ item }) => {
+      const isMe =
+        item.sender === 'me' || item.senderId === currentLoggedUser?.id;
+      return (
+        <View style={styles.bubbleRowContainer}>
           <View
             style={[
-              styles.msgBubble,
-              isMe ? styles.myBubbleBg : styles.otherBubbleBg,
+              styles.bubbleWrapper,
+              isMe ? styles.myBubbleAlign : styles.otherBubbleAlign,
             ]}
           >
-            <Text
-              style={[styles.msgText, isMe ? styles.myText : styles.otherText]}
+            <View
+              style={[
+                styles.msgBubble,
+                isMe ? styles.myBubbleBg : { backgroundColor: colors.border },
+              ]}
             >
-              {item.text}
+              <Text
+                style={[
+                  styles.msgText,
+                  isMe ? styles.myText : { color: colors.text },
+                ]}
+              >
+                {item.text}
+              </Text>
+            </View>
+            <Text
+              style={[
+                styles.timeStamp,
+                isMe ? styles.myTimeAlign : styles.otherTimeAlign,
+              ]}
+            >
+              {item.time}
             </Text>
           </View>
-
-          <Text
-            style={[
-              styles.timeStamp,
-              isMe ? styles.myTimeAlign : styles.otherTimeAlign,
-            ]}
-          >
-            {item.time}
-          </Text>
         </View>
-      </View>
-    );
-  };
+      );
+    },
+    [currentLoggedUser?.id, colors.border, colors.text],
+  );
 
   return (
-    <SafeAreaView style={styles.container}>
-      {/* Top Profile Context Header Control Bar */}
-      <View style={styles.header}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.background }]}
+    >
+      {/* Top Header Section */}
+      <View
+        style={[
+          styles.header,
+          { backgroundColor: colors.card, borderBottomColor: colors.border },
+        ]}
+      >
         <View style={styles.headerLeftContainer}>
           <TouchableOpacity
             onPress={() => navigation.goBack()}
             style={styles.backButton}
           >
-            <Ionicons name="chevron-back" size={26} color="#000000" />
+            <Ionicons name="chevron-back" size={26} color={colors.text} />
           </TouchableOpacity>
           <Image source={{ uri: user.image }} style={styles.headerAvatar} />
           <View style={styles.headerTextWrapper}>
-            <Text style={styles.headerProfileName}>{user.name}</Text>
-            <Text style={styles.headerSubtitleStatus}>Online</Text>
+            <Text style={[styles.headerProfileName, { color: colors.text }]}>
+              {user.name}
+            </Text>
+            <Text style={styles.headerSubtitleStatus}>
+              {isOtherUserTyping ? 'typing...' : 'Online'}
+            </Text>
           </View>
         </View>
 
         <View style={styles.headerRightContainer}>
-          <TouchableOpacity style={styles.headerActionButton}>
-            <Ionicons name="call" size={22} color="#000000" />
+          <TouchableOpacity
+            style={styles.headerActionButton}
+            onPress={handleAppVideoCallInitiate}
+          >
+            <Ionicons name="videocam" size={22} color="#6338E8" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.headerActionButton}>
-            <Ionicons name="ellipsis-vertical" size={22} color="#000000" />
+            <Ionicons name="ellipsis-vertical" size={22} color={colors.text} />
           </TouchableOpacity>
         </View>
       </View>
 
-      {/* Messages Scroll Area Content Component */}
+      {/* Messages Feed Viewport with rendering constraint configurations */}
       <FlatList
+        ref={listRef}
         data={messages}
         keyExtractor={item => item.id}
         renderItem={renderBubble}
         contentContainerStyle={styles.chatListContent}
         showsVerticalScrollIndicator={false}
+        initialNumToRender={15}
+        maxToRenderPerBatch={10}
+        windowSize={5}
+        removeClippedSubviews={Platform.OS === 'android'}
+        onContentSizeChange={() =>
+          listRef.current?.scrollToEnd({ animated: true })
+        }
       />
 
       {/* Composition Input Tray Section */}
@@ -159,28 +314,11 @@ export default function ChatScreen({ route, navigation }) {
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
       >
-        <View style={styles.inputToolbarContainer}>
-          <View style={styles.inputWrapperFrame}>
-            <TextInput
-              style={styles.textInputField}
-              placeholder="Type a message..."
-              placeholderTextColor="#9CA3AF"
-              value={inputMessage}
-              onChangeText={setInputMessage}
-              multiline
-            />
-            <TouchableOpacity style={styles.emojiButton}>
-              <Ionicons name="happy-outline" size={24} color="#9CA3AF" />
-            </TouchableOpacity>
-          </View>
-
-          <TouchableOpacity
-            style={styles.sendActionButton}
-            onPress={handleSend}
-          >
-            <Ionicons name="send" size={20} color="#FFFFFF" />
-          </TouchableOpacity>
-        </View>
+        <ChatInputToolbar
+          onSendMessage={onSendPayload}
+          onTypingStatusChange={handleTypingStatusChange}
+          colors={colors}
+        />
       </KeyboardAvoidingView>
     </SafeAreaView>
   );
@@ -189,7 +327,6 @@ export default function ChatScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
   },
   header: {
     height: 64,
@@ -198,8 +335,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F3F4F6',
-    backgroundColor: '#FFFFFF',
   },
   headerLeftContainer: {
     flexDirection: 'row',
@@ -221,7 +356,6 @@ const styles = StyleSheet.create({
   headerProfileName: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#000000',
   },
   headerSubtitleStatus: {
     fontSize: 12,
@@ -232,7 +366,7 @@ const styles = StyleSheet.create({
   headerRightContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 4,
   },
   headerActionButton: {
     padding: 8,
@@ -264,19 +398,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#6338E8',
     borderBottomRightRadius: 4,
   },
-  otherBubbleBg: {
-    backgroundColor: '#F3F4F6',
-    borderBottomLeftRadius: 4,
-  },
   msgText: {
     fontSize: 15,
     lineHeight: 20,
   },
   myText: {
     color: '#FFFFFF',
-  },
-  otherText: {
-    color: '#000000',
   },
   timeStamp: {
     fontSize: 11,
@@ -297,14 +424,11 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: 'center',
     borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
-    backgroundColor: '#FFFFFF',
     gap: 12,
   },
   inputWrapperFrame: {
     flex: 1,
     flexDirection: 'row',
-    backgroundColor: '#F3F4F6',
     borderRadius: 24,
     alignItems: 'center',
     paddingHorizontal: 16,
@@ -314,7 +438,6 @@ const styles = StyleSheet.create({
   textInputField: {
     flex: 1,
     fontSize: 15,
-    color: '#000000',
     paddingVertical: 8,
   },
   emojiButton: {
@@ -327,5 +450,10 @@ const styles = StyleSheet.create({
     backgroundColor: '#6338E8',
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#6338E8',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
 });

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,23 +7,127 @@ import {
   StyleSheet,
   Alert,
   SafeAreaView,
+  ActivityIndicator,
 } from 'react-native';
-// If using Expo, run: npx expo install expo-symbols or use Ionicons/MaterialCommunityIcons
-// For this example, we assume Ionicons or generic vector icons for the eye tog
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
+// Redux Global Memory Hook Integration
+import useAuth from '../../hooks/useAuth';
+
+// Isolated Clean Local Database Storage Service Wrappers
+import storageService from '../../services/storageService';
+
+// Form Field Business Logic Security Utilities
+import { isValidEmail } from '../../utils/validators';
+import { STORAGE_KEYS } from '../../utils/constants';
+
 export default function LoginScreen({ navigation }) {
+  // Pull core state management hooks out from Redux architecture slices
+  const { login } = useAuth();
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
 
-  const handleLogin = () => {
-    if (!email.trim() || !password.trim()) {
+  // Automatically parse storage files to check for an existing validation user token
+  useEffect(() => {
+    checkExistingSession();
+  });
+
+  const checkExistingSession = async () => {
+    try {
+      // Access storage layer via your storage service manager
+      const savedUser = await storageService.getItem(STORAGE_KEYS.USER);
+      const savedToken = await storageService.getItem(STORAGE_KEYS.TOKEN);
+
+      if (savedUser && savedToken) {
+        console.log(
+          'Valid local session discovered. Syncing state to Redux memory wrapper...',
+        );
+
+        // Sync the stored user structure directly down into your active Redux memory state
+        login({ user: savedUser, token: savedToken });
+
+        // Forward authenticated router execution path past login forms safely
+        navigation.getParent()?.navigate('App');
+      }
+    } catch (error) {
+      console.error(
+        'Failed processing internal database validation properties:',
+        error,
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleLogin = async () => {
+    const cleanEmail = email.trim();
+
+    // Validate email structure using your utility layer before attempting network execution
+    if (!cleanEmail || !password.trim()) {
       Alert.alert('Missing Information', 'Please enter email and password');
       return;
     }
-    navigation.getParent()?.navigate('App');
+
+    if (!isValidEmail(cleanEmail)) {
+      Alert.alert(
+        'Invalid Input',
+        'Please enter a valid email address structure.',
+      );
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+
+      // Simulated local authenticated database return payload
+      const mockUserAuthPayload = {
+        id: 'user_shahid_99',
+        name: 'Shahid',
+        email: cleanEmail.toLowerCase(),
+        role: 'Product Manager',
+        location: 'Bangalore',
+        image:
+          'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&q=80&w=300',
+        about: 'Building Vebolos applications. 🚀',
+        interests: ['Tech', 'Design', 'Music'],
+      };
+
+      const mockJwtToken = 'mock_jwt_session_token_xyzabc123';
+
+      // 1. Commit values securely down to device storage layer
+      await storageService.setItem(STORAGE_KEYS.USER, mockUserAuthPayload);
+      await storageService.setItem(STORAGE_KEYS.TOKEN, mockJwtToken);
+
+      // 2. Synchronize memory workspace states up using Redux action dispatch handlers
+      login({ user: mockUserAuthPayload, token: mockJwtToken });
+
+      console.log(
+        'Authentication properties committed successfully across all domains.',
+      );
+
+      // 3. Forward state flow into the main application router environment
+      navigation.getParent()?.navigate('App');
+    } catch (error) {
+      Alert.alert(
+        'Authentication Error',
+        'Something went wrong while executing your login request.',
+      );
+      console.error(error);
+    } finally {
+      setIsLoading(false);
+    }
   };
+
+  if (isLoading) {
+    return (
+      <View style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color="#6338E8" />
+      </View>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.container}>
@@ -123,6 +227,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#FFFFFF',
+  },
+  loadingContainer: {
+    flex: 1,
+    backgroundColor: '#FFFFFF',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   innerContainer: {
     flex: 1,

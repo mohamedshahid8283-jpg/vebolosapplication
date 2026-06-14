@@ -10,9 +10,21 @@ import {
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
+// Redux Architecture State Integrations
+import { useSelector } from 'react-redux';
+
+// Architecture Design System Custom Hooks
+import useTheme from '../../hooks/useTheme';
+
 export default function ProfileScreen({ navigation }) {
-  // Mock data representing the visual profile configuration
-  const userProfile = {
+  // Extract global dynamic color tokens matching current mode configurations
+  const { colors } = useTheme();
+
+  // Retrieve authenticated active profile payload directly from the Redux store slice
+  const { user } = useSelector(state => state.auth);
+
+  // Fallback visual structure configuration if store fields resolve as null initially
+  const userProfile = user || {
     name: 'Rohan',
     age: 26,
     role: 'Product Manager',
@@ -29,10 +41,22 @@ export default function ProfileScreen({ navigation }) {
     },
   };
 
+  // Safe checks to avoid crashing if nested attributes or stats are empty
+  const profileStats = userProfile.stats || {
+    likes: '—',
+    matches: 0,
+    chats: 0,
+  };
+  const profileInterests = userProfile.interests || [];
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.background }]}
+    >
       {/* Top Profile Header Title */}
-      <Text style={styles.screenHeaderTitle}>Profile</Text>
+      <Text style={[styles.screenHeaderTitle, { color: colors.text }]}>
+        Profile
+      </Text>
 
       <ScrollView
         showsVerticalScrollIndicator={false}
@@ -43,14 +67,20 @@ export default function ProfileScreen({ navigation }) {
           <View style={styles.avatarOuterFrame}>
             <Image
               source={{ uri: userProfile.image }}
-              style={styles.userAvatarImage}
+              style={[
+                styles.userAvatarImage,
+                { backgroundColor: colors.border },
+              ]}
             />
             <TouchableOpacity
-              style={styles.cameraFloatingButton}
+              style={[
+                styles.cameraFloatingButton,
+                { backgroundColor: colors.card, borderColor: colors.border },
+              ]}
               activeOpacity={0.8}
               onPress={() => navigation.navigate('EditProfile')}
             >
-              <Ionicons name="camera" size={16} color="#000000" />
+              <Ionicons name="camera" size={16} color={colors.text} />
             </TouchableOpacity>
           </View>
         </View>
@@ -58,38 +88,62 @@ export default function ProfileScreen({ navigation }) {
         {/* Identity Headings Block */}
         <View style={styles.identityContainer}>
           <View style={styles.nameRow}>
-            <Text style={styles.profileNameText}>
-              {userProfile.name}, {userProfile.age}
+            <Text style={[styles.profileNameText, { color: colors.text }]}>
+              {userProfile.name}, {userProfile.age || '26'}
             </Text>
             <Ionicons name="checkmark-circle" size={18} color="#6338E8" />
           </View>
-          <Text style={styles.metaRoleLocationText}>
-            {userProfile.role} • {userProfile.location}
+          <Text
+            style={[styles.metaRoleLocationText, { color: colors.subText }]}
+          >
+            {userProfile.role || 'Member'} •{' '}
+            {userProfile.location || 'Bangalore'}
           </Text>
         </View>
 
         {/* About Me Info Section */}
         <View style={styles.infoSectionBlock}>
-          <Text style={styles.sectionHeadingTitle}>About me</Text>
-          <Text style={styles.paragraphBodyDescription}>
-            {userProfile.about}
+          <Text style={[styles.sectionHeadingTitle, { color: colors.text }]}>
+            About me
+          </Text>
+          <Text
+            style={[styles.paragraphBodyDescription, { color: colors.text }]}
+          >
+            {userProfile.about || 'No details provided yet.'}
           </Text>
         </View>
 
         {/* Dynamic Interests Tags Row */}
-        <View style={styles.infoSectionBlock}>
-          <Text style={styles.sectionHeadingTitle}>Interests</Text>
-          <View style={styles.interestsFlexGrid}>
-            {userProfile.interests.map((interest, index) => (
-              <View key={index} style={styles.tagCapsule}>
-                <Text style={styles.tagCapsuleText}>{interest}</Text>
-              </View>
-            ))}
+        {profileInterests.length > 0 && (
+          <View style={styles.infoSectionBlock}>
+            <Text style={[styles.sectionHeadingTitle, { color: colors.text }]}>
+              Interests
+            </Text>
+            <View style={styles.interestsFlexGrid}>
+              {profileInterests.map((interest, index) => (
+                <View
+                  key={index}
+                  style={[
+                    styles.tagCapsule,
+                    { backgroundColor: colors.border },
+                  ]}
+                >
+                  <Text style={[styles.tagCapsuleText, { color: colors.text }]}>
+                    {interest}
+                  </Text>
+                </View>
+              ))}
+            </View>
           </View>
-        </View>
+        )}
 
         {/* Divider Separation Break Line */}
-        <View style={styles.horizontalBreakLine} />
+        <View
+          style={[
+            styles.horizontalBreakLine,
+            { backgroundColor: colors.border },
+          ]}
+        />
 
         {/* Statistics Metric Row Dashboard */}
         <View style={styles.metricsDashboardRow}>
@@ -101,51 +155,100 @@ export default function ProfileScreen({ navigation }) {
               color="#EF4444"
               style={styles.metricIconMargin}
             />
-            <Text style={styles.metricLabelSubtitle}>Likes</Text>
+            <Text
+              style={[
+                styles.metricValueNumberText,
+                { color: colors.text, fontSize: 16 },
+              ]}
+            >
+              {profileStats.likes || '—'}
+            </Text>
+            <Text
+              style={[styles.metricLabelSubtitle, { color: colors.subText }]}
+            >
+              Likes
+            </Text>
           </View>
 
-          <View style={styles.verticalDividerLine} />
+          <View
+            style={[
+              styles.verticalDividerLine,
+              { backgroundColor: colors.border },
+            ]}
+          />
 
           {/* Matches Metric block */}
           <View style={styles.metricColumnCard}>
-            <Text style={styles.metricValueNumberText}>
-              {userProfile.stats.matches}
+            <Text
+              style={[styles.metricValueNumberText, { color: colors.text }]}
+            >
+              {profileStats.matches}
             </Text>
-            <Text style={styles.metricLabelSubtitle}>Matches</Text>
+            <Text
+              style={[styles.metricLabelSubtitle, { color: colors.subText }]}
+            >
+              Matches
+            </Text>
           </View>
 
-          <View style={styles.verticalDividerLine} />
+          <View
+            style={[
+              styles.verticalDividerLine,
+              { backgroundColor: colors.border },
+            ]}
+          />
 
           {/* Chats Metric block */}
           <View style={styles.metricColumnCard}>
-            <Text style={styles.metricValueNumberText}>
-              {userProfile.stats.chats}
+            <Text
+              style={[styles.metricValueNumberText, { color: colors.text }]}
+            >
+              {profileStats.chats}
             </Text>
-            <Text style={styles.metricLabelSubtitle}>Chats</Text>
+            <Text
+              style={[styles.metricLabelSubtitle, { color: colors.subText }]}
+            >
+              Chats
+            </Text>
           </View>
         </View>
 
         {/* Divider Separation Break Line */}
-        <View style={styles.horizontalBreakLine} />
+        <View
+          style={[
+            styles.horizontalBreakLine,
+            { backgroundColor: colors.border },
+          ]}
+        />
 
         {/* Navigation Shortcut Buttons Container */}
         <View style={styles.navigationButtonsRow}>
           <TouchableOpacity
-            style={styles.actionCardButton}
+            style={[
+              styles.actionCardButton,
+              { backgroundColor: colors.card, borderColor: colors.border },
+            ]}
             onPress={() => navigation.navigate('EditProfile')}
             activeOpacity={0.7}
           >
             <Ionicons name="create-outline" size={20} color="#6338E8" />
-            <Text style={styles.actionCardButtonText}>Edit Profile</Text>
+            <Text style={[styles.actionCardButtonText, { color: colors.text }]}>
+              Edit Profile
+            </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            style={styles.actionCardButton}
+            style={[
+              styles.actionCardButton,
+              { backgroundColor: colors.card, borderColor: colors.border },
+            ]}
             onPress={() => navigation.navigate('Settings')}
             activeOpacity={0.7}
           >
             <Ionicons name="settings-outline" size={20} color="#4B5563" />
-            <Text style={styles.actionCardButtonText}>Settings</Text>
+            <Text style={[styles.actionCardButtonText, { color: colors.text }]}>
+              Settings
+            </Text>
           </TouchableOpacity>
         </View>
       </ScrollView>
@@ -156,12 +259,10 @@ export default function ProfileScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
   },
   screenHeaderTitle: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#000000',
     paddingHorizontal: 20,
     marginTop: 16,
     marginBottom: 8,
@@ -183,13 +284,11 @@ const styles = StyleSheet.create({
     width: 130,
     height: 130,
     borderRadius: 65,
-    backgroundColor: '#F3F4F6',
   },
   cameraFloatingButton: {
     position: 'absolute',
     bottom: 2,
     right: 2,
-    backgroundColor: '#FFFFFF',
     width: 34,
     height: 34,
     borderRadius: 17,
@@ -201,7 +300,6 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 4,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
   },
   identityContainer: {
     alignItems: 'center',
@@ -215,11 +313,9 @@ const styles = StyleSheet.create({
   profileNameText: {
     fontSize: 22,
     fontWeight: '700',
-    color: '#000000',
   },
   metaRoleLocationText: {
     fontSize: 14,
-    color: '#6B7280',
     marginTop: 6,
     fontWeight: '500',
   },
@@ -229,12 +325,10 @@ const styles = StyleSheet.create({
   sectionHeadingTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#000000',
     marginBottom: 10,
   },
   paragraphBodyDescription: {
     fontSize: 14,
-    color: '#444444',
     lineHeight: 20,
     fontWeight: '400',
   },
@@ -244,19 +338,16 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   tagCapsule: {
-    backgroundColor: '#F3F4F6',
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
   },
   tagCapsuleText: {
     fontSize: 13,
-    color: '#374151',
     fontWeight: '500',
   },
   horizontalBreakLine: {
     height: 1,
-    backgroundColor: '#F3F4F6',
     marginVertical: 12,
   },
   metricsDashboardRow: {
@@ -269,7 +360,7 @@ const styles = StyleSheet.create({
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    height: 50,
+    height: 55,
   },
   metricIconMargin: {
     marginBottom: 2,
@@ -277,18 +368,15 @@ const styles = StyleSheet.create({
   metricValueNumberText: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#000000',
-    marginBottom: 4,
+    marginBottom: 2,
   },
   metricLabelSubtitle: {
     fontSize: 13,
-    color: '#6B7280',
     fontWeight: '500',
   },
   verticalDividerLine: {
     width: 1,
     height: 32,
-    backgroundColor: '#E5E7EB',
   },
   navigationButtonsRow: {
     flexDirection: 'row',
@@ -304,9 +392,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
     height: 50,
-    backgroundColor: '#FFFFFF',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
     borderRadius: 14,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
@@ -317,6 +402,5 @@ const styles = StyleSheet.create({
   actionCardButtonText: {
     fontSize: 14,
     fontWeight: '600',
-    color: '#1F2937',
   },
 });

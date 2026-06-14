@@ -10,10 +10,17 @@ import {
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
+// Global Context Architecture Theme Custom Hook Integration
+import useTheme from '../../hooks/useTheme';
+
 export default function UserDetailsScreen({ route, navigation }) {
-  // Safeguard parameters resolution structure
+  // Extract global light/dark dynamic color definitions matching theme configurations
+  const { colors } = useTheme();
+
+  // Safeguard parameter resolution parsing structure with dynamic fallbacks
   const { user } = route.params || {
     user: {
+      id: 'fallback_user',
       name: 'Aanya',
       age: 24,
       role: 'Designer',
@@ -25,18 +32,34 @@ export default function UserDetailsScreen({ route, navigation }) {
     },
   };
 
+  // Navigates straight to the Chat view session, forwarding user data parameters
+  const handleOpenChat = () => {
+    navigation.navigate('Chat', { user });
+  };
+
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.background }]}
+    >
       {/* Context Action Top Header */}
-      <View style={styles.header}>
+      <View
+        style={[
+          styles.header,
+          {
+            backgroundColor: colors.card,
+            borderBottomColor: colors.border,
+            borderBottomWidth: 1,
+          },
+        ]}
+      >
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.iconPadding}
         >
-          <Ionicons name="arrow-back" size={24} color="#000000" />
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
         <TouchableOpacity style={styles.iconPadding}>
-          <Ionicons name="ellipsis-horizontal" size={24} color="#000000" />
+          <Ionicons name="ellipsis-horizontal" size={24} color={colors.text} />
         </TouchableOpacity>
       </View>
 
@@ -44,36 +67,53 @@ export default function UserDetailsScreen({ route, navigation }) {
         showsVerticalScrollIndicator={false}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* Main Clean Profile Image Section */}
+        {/* Main Profile Image Section */}
         <Image source={{ uri: user.image }} style={styles.profileHeroImage} />
 
         {/* Primary Meta Identity Profile Details Block */}
         <View style={styles.metaTextContainer}>
           <View style={styles.titleRow}>
-            <Text style={styles.displayName}>
+            <Text style={[styles.displayName, { color: colors.text }]}>
               {user.name}, {user.age}
             </Text>
             <Ionicons name="checkmark-circle" size={20} color="#6338E8" />
           </View>
-          <Text style={styles.subtitleSubtext}>
+          <Text style={[styles.subtitleSubtext, { color: colors.subText }]}>
             {user.role} • {user.location}
           </Text>
         </View>
 
         {/* About Me Segment */}
         <View style={styles.infoSection}>
-          <Text style={styles.sectionHeader}>About me</Text>
-          <Text style={styles.paragraphBodyText}>{user.about}</Text>
+          <Text style={[styles.sectionHeader, { color: colors.text }]}>
+            About me
+          </Text>
+          <Text style={[styles.paragraphBodyText, { color: colors.text }]}>
+            {user.about}
+          </Text>
         </View>
 
         {/* Dynamic Categorized Interests Tag Grid */}
         <View style={styles.infoSection}>
-          <Text style={styles.sectionHeader}>Interests</Text>
+          <Text style={[styles.sectionHeader, { color: colors.text }]}>
+            Interests
+          </Text>
           <View style={styles.interestsGrid}>
             {user.interests &&
               user.interests.map((interest, index) => (
-                <View key={index} style={styles.tagItem}>
-                  <Text style={styles.tagText}>{interest}</Text>
+                <View
+                  key={index}
+                  style={[
+                    styles.tagItem,
+                    {
+                      backgroundColor: colors.card,
+                      borderColor: colors.border,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.tagText, { color: colors.text }]}>
+                    {interest}
+                  </Text>
                 </View>
               ))}
           </View>
@@ -81,13 +121,27 @@ export default function UserDetailsScreen({ route, navigation }) {
       </ScrollView>
 
       {/* Floating Call to Action Footer Module */}
-      <View style={styles.footerActionMenu}>
-        <TouchableOpacity style={styles.messageActionButton}>
+      <View
+        style={[
+          styles.footerActionMenu,
+          { backgroundColor: colors.card, borderTopColor: colors.border },
+        ]}
+      >
+        <TouchableOpacity
+          style={styles.messageActionButton}
+          onPress={handleOpenChat}
+          activeOpacity={0.8}
+        >
           <Text style={styles.messageButtonText}>Message</Text>
         </TouchableOpacity>
 
-        <TouchableOpacity style={styles.favoriteButtonContainer}>
-          <Ionicons name="heart-outline" size={24} color="#000000" />
+        <TouchableOpacity
+          style={[
+            styles.favoriteButtonContainer,
+            { backgroundColor: colors.card, borderColor: colors.border },
+          ]}
+        >
+          <Ionicons name="heart-outline" size={24} color={colors.text} />
         </TouchableOpacity>
       </View>
     </SafeAreaView>
@@ -97,7 +151,6 @@ export default function UserDetailsScreen({ route, navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
   },
   header: {
     height: 56,
@@ -105,14 +158,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: 16,
-    backgroundColor: '#FFFFFF',
   },
   iconPadding: {
     padding: 6,
   },
   scrollContent: {
     paddingHorizontal: 16,
-    paddingBottom: 100,
+    paddingTop: 12,
+    paddingBottom: 110, // Generates clearance margin spacing past the footer tray overlay container
   },
   profileHeroImage: {
     width: '100%',
@@ -132,11 +185,9 @@ const styles = StyleSheet.create({
   displayName: {
     fontSize: 24,
     fontWeight: '700',
-    color: '#000000',
   },
   subtitleSubtext: {
     fontSize: 14,
-    color: '#888888',
     marginTop: 4,
     fontWeight: '500',
   },
@@ -146,12 +197,10 @@ const styles = StyleSheet.create({
   sectionHeader: {
     fontSize: 16,
     fontWeight: '700',
-    color: '#000000',
     marginBottom: 10,
   },
   paragraphBodyText: {
     fontSize: 14,
-    color: '#444444',
     lineHeight: 20,
   },
   interestsGrid: {
@@ -160,16 +209,13 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   tagItem: {
-    backgroundColor: '#F3F4F6',
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
   },
   tagText: {
     fontSize: 13,
-    color: '#444444',
     fontWeight: '500',
   },
   footerActionMenu: {
@@ -178,9 +224,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     height: 84,
-    backgroundColor: '#FFFFFF',
     borderTopWidth: 1,
-    borderTopColor: '#F3F4F6',
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
@@ -193,6 +237,11 @@ const styles = StyleSheet.create({
     borderRadius: 16,
     justifyContent: 'center',
     alignItems: 'center',
+    shadowColor: '#6338E8',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 3,
   },
   messageButtonText: {
     color: '#FFFFFF',
@@ -204,9 +253,7 @@ const styles = StyleSheet.create({
     height: 52,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: '#E5E7EB',
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
   },
 });

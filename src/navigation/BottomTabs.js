@@ -10,12 +10,14 @@ import MessagesScreen from '../screens/Chat/MessagesScreen';
 import VideoCallScreen from '../screens/VideoCall/VideoCallScreen';
 import ProfileScreen from '../screens/Profile/ProfileScreen';
 
+// Architecture Design System Custom Theme Hook Integration
 import useTheme from '../hooks/useTheme';
 
 const Tab = createBottomTabNavigator();
 
 export default function BottomTabs() {
-  const colors = useTheme();
+  // FIXED: Destructured colors property out from your custom useTheme hook return schema
+  const { colors } = useTheme();
 
   return (
     <Tab.Navigator
@@ -31,14 +33,14 @@ export default function BottomTabs() {
           bottom: 20,
           height: 70,
           borderRadius: 35,
-          backgroundColor: colors.card,
+          backgroundColor: colors.card, // Now correctly resolves light/dark card color
           borderTopWidth: 0,
           elevation: 12,
-          shadowColor: '#000',
+          shadowColor: '#000000',
           shadowOffset: { width: 0, height: 4 },
           shadowOpacity: 0.1,
           shadowRadius: 8,
-          // Hide tab bar completely when the VideoCall screen route is selected
+          // Hide tab bar completely when the VideoCall screen route is active
           display: route.name === 'VideoCall' ? 'none' : 'flex',
         },
 
@@ -67,11 +69,19 @@ export default function BottomTabs() {
           }
 
           return (
-            <View style={[styles.iconContainer, focused && styles.activeIcon]}>
+            <View
+              style={[
+                styles.iconContainer,
+                focused && [
+                  styles.activeIcon,
+                  { backgroundColor: colors.primary },
+                ],
+              ]}
+            >
               <Ionicons
                 name={iconName}
                 size={24}
-                color={focused ? '#fff' : colors.subText}
+                color={focused ? '#FFFFFF' : colors.subText} // Correctly flags text state hues
               />
             </View>
           );
@@ -95,6 +105,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   activeIcon: {
-    backgroundColor: '#7C4DFF', // Your active indicator accent color
+    // Dynamic background primary fallback is injected inline via colors.primary token asset wrapper paths
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
 });

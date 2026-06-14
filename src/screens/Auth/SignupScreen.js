@@ -7,24 +7,90 @@ import {
   StyleSheet,
   SafeAreaView,
   Alert,
+  ActivityIndicator,
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
+// Redux State Architecture Hooks
+import useAuth from '../../hooks/useAuth';
+
+// Central Database Persistence Layer Services
+import storageService from '../../services/storageService';
+
+// Business Logic Verification Utilities
+import { isValidEmail, isValidPassword } from '../../utils/validators';
+import { STORAGE_KEYS } from '../../utils/constants';
+
 export default function SignupScreen({ navigation }) {
+  // Extract state setup methods out from Redux hooks
+  const { login } = useAuth();
+
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [passwordVisible, setPasswordVisible] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSignUp = () => {
-    if (!name.trim() || !email.trim() || !password.trim()) {
+  const handleSignUp = async () => {
+    const cleanName = name.trim();
+    const cleanEmail = email.trim();
+    const cleanPassword = password.trim();
+
+    // 1. Mandatory Input Fields Verification Check
+    if (!cleanName || !cleanEmail || !cleanPassword) {
       Alert.alert(
         'Missing Fields',
         'Please fill out all elements to get started.',
       );
       return;
     }
-    navigation.navigate('ProfileCreate');
+
+    // 2. Email Regular Expression Architecture Validation Check
+    if (!isValidEmail(cleanEmail)) {
+      Alert.alert(
+        'Invalid Email',
+        'Please enter a valid email address structure.',
+      );
+      return;
+    }
+
+    // 3. Password Minimum Character Limitation Security Validation Check
+    if (!isValidPassword(cleanPassword)) {
+      Alert.alert(
+        'Weak Password',
+        'Password must be at least 6 characters long.',
+      );
+      return;
+    }
+
+    try {
+      setIsLoading(true);
+
+      // Package initial credential metadata payload keys
+      const initialRegistrationData = {
+        name: cleanName,
+        email: cleanEmail.toLowerCase(),
+      };
+
+      // 4. Cache data state down to an isolated storage session key
+      // This allows 'ProfileCreateScreen' to append DOB, preferences, and photos later
+      await storageService.setItem(STORAGE_KEYS.USER, initialRegistrationData);
+
+      console.log(
+        'Initial credential keys cached successfully inside storageService.',
+      );
+
+      // 5. Forward user to the profile setup screen workspace
+      navigation.navigate('ProfileCreate');
+    } catch (error) {
+      console.error('Failed writing initial registration properties:', error);
+      Alert.alert(
+        'Registration Error',
+        'Something went wrong while initializing your account setup.',
+      );
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
@@ -43,6 +109,7 @@ export default function SignupScreen({ navigation }) {
             style={styles.input}
             value={name}
             onChangeText={setName}
+            editable={!isLoading}
           />
         </View>
 
@@ -57,6 +124,7 @@ export default function SignupScreen({ navigation }) {
             onChangeText={setEmail}
             keyboardType="email-address"
             autoCapitalize="none"
+            editable={!isLoading}
           />
         </View>
 
@@ -72,10 +140,12 @@ export default function SignupScreen({ navigation }) {
               value={password}
               onChangeText={setPassword}
               autoCapitalize="none"
+              editable={!isLoading}
             />
             <TouchableOpacity
               onPress={() => setPasswordVisible(!passwordVisible)}
               style={styles.eyeIcon}
+              disabled={isLoading}
             >
               <Ionicons
                 name={passwordVisible ? 'eye-outline' : 'eye-off-outline'}
@@ -87,8 +157,16 @@ export default function SignupScreen({ navigation }) {
         </View>
 
         {/* Sign Up Button */}
-        <TouchableOpacity style={styles.button} onPress={handleSignUp}>
-          <Text style={styles.buttonText}>Sign Up</Text>
+        <TouchableOpacity
+          style={styles.button}
+          onPress={handleSignUp}
+          disabled={isLoading}
+        >
+          {isLoading ? (
+            <ActivityIndicator size="small" color="#FFFFFF" />
+          ) : (
+            <Text style={styles.buttonText}>Sign Up</Text>
+          )}
         </TouchableOpacity>
 
         {/* Divider Row */}
@@ -100,13 +178,13 @@ export default function SignupScreen({ navigation }) {
 
         {/* Social Register Options */}
         <View style={styles.socialContainer}>
-          <TouchableOpacity style={styles.socialButton}>
+          <TouchableOpacity style={styles.socialButton} disabled={isLoading}>
             <Ionicons name="logo-google" size={24} color="#EA4335" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.socialButton}>
+          <TouchableOpacity style={styles.socialButton} disabled={isLoading}>
             <Ionicons name="logo-apple" size={24} color="#000000" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.socialButton}>
+          <TouchableOpacity style={styles.socialButton} disabled={isLoading}>
             <Ionicons name="logo-facebook" size={24} color="#1877F2" />
           </TouchableOpacity>
         </View>
@@ -114,7 +192,10 @@ export default function SignupScreen({ navigation }) {
         {/* Bottom Switch Screen Link */}
         <View style={styles.footerContainer}>
           <Text style={styles.footerText}>Already have an account? </Text>
-          <TouchableOpacity onPress={() => navigation.navigate('Login')}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Login')}
+            disabled={isLoading}
+          >
             <Text style={styles.footerLink}>Log in</Text>
           </TouchableOpacity>
         </View>

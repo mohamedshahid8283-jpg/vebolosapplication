@@ -1,0 +1,15 @@
+{
+  "activeUsersCount": 148,
+  "profiles": [
+    {
+      "id": "user_01",
+      "name": "Aanya",
+      "age": 24,
+      "role": "Designer",
+      "location": "Bangalore",
+      "image": "https://images.unsplash.com/photo-1524504388940-b1c1722653e1?auto=format&fit=crop&q=80&w=600",
+      "about": "Love traveling, coffee and deep conversations. 💜",
+      "interests": ["Travel", "Photography", "Music", "Coffee"]
+    }
+  ]
+}

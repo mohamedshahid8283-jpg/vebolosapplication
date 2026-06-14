@@ -11,7 +11,20 @@ import {
 } from 'react-native';
 import Ionicons from 'react-native-vector-icons/Ionicons';
 
+// Redux Global Memory Hook Integrations
+import useAuth from '../../hooks/useAuth';
+import useTheme from '../../hooks/useTheme';
+
+// Centralized Storage Service Architecture
+import storageService from '../../services/storageService';
+
 export default function PrivacyScreen({ navigation }) {
+  // Extract custom theme tokens for dynamic workspace appearance modes
+  const { colors } = useTheme();
+
+  // Extract authentication state drop controls from Redux slice wrappers
+  const { logout } = useAuth();
+
   // State hook managing the Read Receipts boolean switch toggle
   const [readReceipts, setReadReceipts] = useState(true);
 
@@ -72,24 +85,63 @@ export default function PrivacyScreen({ navigation }) {
         {
           text: 'Delete',
           style: 'destructive',
-          onPress: () =>
-            Alert.alert('Account Deleted', 'Your account has been purged.'),
+          onPress: async () => {
+            try {
+              // 1. Purge user registration caches from device storage
+              await storageService.clearStorage();
+
+              // 2. Erase user authentication objects from the global Redux state
+              logout();
+
+              console.log(
+                'Account deleted. Purged storage and updated Redux store.',
+              );
+
+              // 3. Reset stack navigation flow back to the Login anchor gateway screen
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Login' }],
+              });
+            } catch (error) {
+              console.error(
+                'Failed executing clean device state account wipe:',
+                error,
+              );
+              Alert.alert(
+                'Error',
+                'Unable to complete deletion request smoothly.',
+              );
+            }
+          },
         },
       ],
     );
   };
 
   return (
-    <SafeAreaView style={styles.container}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.background }]}
+    >
       {/* Top Standard Action Header Bar Container */}
-      <View style={styles.header}>
+      <View
+        style={[
+          styles.header,
+          {
+            backgroundColor: colors.card,
+            borderBottomColor: colors.border,
+            borderBottomWidth: 1,
+          },
+        ]}
+      >
         <TouchableOpacity
           onPress={() => navigation.goBack()}
           style={styles.headerBackButton}
         >
-          <Ionicons name="arrow-back" size={24} color="#000000" />
+          <Ionicons name="arrow-back" size={24} color={colors.text} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Privacy</Text>
+        <Text style={[styles.headerTitle, { color: colors.text }]}>
+          Privacy
+        </Text>
         <View style={styles.headerSpacer} />
       </View>
 
@@ -99,7 +151,10 @@ export default function PrivacyScreen({ navigation }) {
       >
         <View style={styles.menuListContainer}>
           {privacySettingsOptions.map(item => (
-            <View key={item.id} style={styles.menuItemRow}>
+            <View
+              key={item.id}
+              style={[styles.menuItemRow, { borderBottomColor: colors.border }]}
+            >
               {item.type === 'navigation' ? (
                 /* Interactive Navigation Row Options Component Wrapper */
                 <TouchableOpacity
@@ -108,22 +163,48 @@ export default function PrivacyScreen({ navigation }) {
                   activeOpacity={0.7}
                 >
                   <View style={styles.textWrapper}>
-                    <Text style={styles.itemTitleText}>{item.title}</Text>
-                    <Text style={styles.itemSubtitleText}>{item.subtitle}</Text>
+                    <Text
+                      style={[styles.itemTitleText, { color: colors.text }]}
+                    >
+                      {item.title}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.itemSubtitleText,
+                        { color: colors.subText },
+                      ]}
+                    >
+                      {item.subtitle}
+                    </Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
+                  <Ionicons
+                    name="chevron-forward"
+                    size={18}
+                    color={colors.subText}
+                  />
                 </TouchableOpacity>
               ) : (
                 /* Switch Toggle Row Component Wrapper */
                 <View style={styles.innerItemRow}>
                   <View style={styles.textWrapper}>
-                    <Text style={styles.itemTitleText}>{item.title}</Text>
-                    <Text style={styles.itemSubtitleText}>{item.subtitle}</Text>
+                    <Text
+                      style={[styles.itemTitleText, { color: colors.text }]}
+                    >
+                      {item.title}
+                    </Text>
+                    <Text
+                      style={[
+                        styles.itemSubtitleText,
+                        { color: colors.subText },
+                      ]}
+                    >
+                      {item.subtitle}
+                    </Text>
                   </View>
                   <Switch
                     value={readReceipts}
                     onValueChange={setReadReceipts}
-                    trackColor={{ false: '#E5E7EB', true: '#A78BFA' }}
+                    trackColor={{ false: colors.border, true: '#A78BFA' }}
                     thumbColor={readReceipts ? '#6338E8' : '#F3F4F6'}
                   />
                 </View>
@@ -132,7 +213,9 @@ export default function PrivacyScreen({ navigation }) {
           ))}
 
           {/* Destructive Primary Delete Account Row Element */}
-          <View style={styles.menuItemRow}>
+          <View
+            style={[styles.menuItemRow, { borderBottomColor: colors.border }]}
+          >
             <TouchableOpacity
               style={styles.innerItemRow}
               onPress={handleDeleteAccount}
@@ -142,11 +225,17 @@ export default function PrivacyScreen({ navigation }) {
                 <Text style={[styles.itemTitleText, styles.destructiveText]}>
                   Delete Account
                 </Text>
-                <Text style={styles.itemSubtitleText}>
+                <Text
+                  style={[styles.itemSubtitleText, { color: colors.subText }]}
+                >
                   Permanently delete account
                 </Text>
               </View>
-              <Ionicons name="chevron-forward" size={18} color="#C7C7CC" />
+              <Ionicons
+                name="chevron-forward"
+                size={18}
+                color={colors.subText}
+              />
             </TouchableOpacity>
           </View>
         </View>
@@ -158,7 +247,6 @@ export default function PrivacyScreen({ navigation }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#FFFFFF',
   },
   header: {
     height: 56,
@@ -166,7 +254,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: 16,
-    backgroundColor: '#FFFFFF',
   },
   headerBackButton: {
     padding: 4,
@@ -174,10 +261,9 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: '#000000',
   },
   headerSpacer: {
-    width: 32, // Matches layout sizing framework metrics of the back button to offset title text center alignment perfectly
+    width: 32, // Offsets header padding alignment metrics cleanly
   },
   scrollContent: {
     paddingHorizontal: 20,
@@ -188,7 +274,6 @@ const styles = StyleSheet.create({
   },
   menuItemRow: {
     borderBottomWidth: 1,
-    borderBottomColor: '#F9FAFB',
   },
   innerItemRow: {
     flexDirection: 'row',
@@ -203,12 +288,10 @@ const styles = StyleSheet.create({
   itemTitleText: {
     fontSize: 15,
     fontWeight: '600',
-    color: '#000000',
     marginBottom: 4,
   },
   itemSubtitleText: {
     fontSize: 13,
-    color: '#8E8E93',
     fontWeight: '400',
   },
   destructiveText: {

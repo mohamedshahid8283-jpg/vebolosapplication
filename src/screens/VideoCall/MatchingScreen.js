@@ -1,14 +1,24 @@
 import React from 'react';
 import { View, Text, ActivityIndicator, StyleSheet } from 'react-native';
 
+// Architecture Design System Custom Theme Hook Integration
+import useTheme from '../../hooks/useTheme';
+
 export default function MatchingScreen() {
+  // Extract custom dynamic theme styling properties
+  const { colors } = useTheme();
+
   return (
-    <View style={styles.container}>
-      <ActivityIndicator size="large" color="#7C4DFF" />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <ActivityIndicator size="large" color={colors.primary} />
 
-      <Text style={styles.title}>Finding Your Next Vibe...</Text>
+      <Text style={[styles.title, { color: colors.text }]}>
+        Finding Your Next Vibe...
+      </Text>
 
-      <Text style={styles.subtitle}>Connecting with random users</Text>
+      <Text style={[styles.subtitle, { color: colors.subText }]}>
+        Connecting with random users
+      </Text>
     </View>
   );
 }
@@ -18,17 +28,18 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
+    paddingHorizontal: 24,
   },
-
   title: {
-    color: '#fff',
-    fontSize: 26,
+    fontSize: 24,
     fontWeight: '700',
-    marginTop: 20,
+    marginTop: 24,
+    textAlign: 'center',
   },
-
   subtitle: {
-    color: '#aaa',
-    marginTop: 10,
+    fontSize: 14,
+    marginTop: 8,
+    fontWeight: '500',
+    textAlign: 'center',
   },
 });
